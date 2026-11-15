@@ -4,7 +4,7 @@ export function eventForm(event={}, day=dateKey()) {
   return `<form data-form="event" class="panel form-grid">
   <input type="hidden" name="id" value="${safe(event.id)}">
   <h2>${event.id?'Editar evento':'Nuevo evento'}</h2>
-  <label>Nombre<input name="title" required maxlength="120" value="${safe(event.title)}"></label>
+  <label>Nombre<input name="title" autocomplete="off" required maxlength="120" value="${safe(event.title)}"></label>
   <label>Fecha<input name="date" type="date" required value="${safe(event.date||day)}"></label>
   <div class="pair"><label>Comienza<input name="start" type="time" required value="${safe(event.start||'09:00')}"></label><label>Termina<input name="end" type="time" required value="${safe(event.end||'10:00')}"></label></div>
   <label>Categoría<select name="category">${Object.entries(categories).map(([key,name])=>`<option value="${key}" ${event.category===key?'selected':''}>${name}</option>`).join('')}</select></label>
@@ -13,7 +13,7 @@ export function eventForm(event={}, day=dateKey()) {
 }
 const abbreviations=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 const eventChip = event => `<span class="chip ${categories[event.category]?event.category:'otro'}">${safe(event.title)}</span>`;
-const eventLine = (event,tv) => `<${tv?'article':'button type="button" data-edit="'+safe(event.id)+'"'} class="entry"><time>${readableHour(event.start)}–${readableHour(event.end)}</time><span>${eventChip(event)}${event.notes?`<small>${safe(event.notes)}</small>`:''}</span></${tv?'article':'button'}>`;
+const eventLine = (event,readOnly) => `<${readOnly?'article':'button type="button" data-edit="'+safe(event.id)+'"'} class="entry"><time>${readableHour(event.start)}–${readableHour(event.end)}</time><span class="entry-content">${eventChip(event)}${event.notes?`<small>${safe(event.notes)}</small>`:''}</span></${readOnly?'article':'button'}>`;
 
 export function calendarView(events,{day,view,tv,signedIn,editing}) {
   const month=monthStart(day), week=weekStart(day);
@@ -36,12 +36,12 @@ export function calendarView(events,{day,view,tv,signedIn,editing}) {
     const end=Math.max(20,...entries.map(e=>Math.min(23,Number(e.end.slice(0,2)))));
     content=`<div class="timeline">${Array.from({length:end-start+1},(_,index)=>{
       const hour=String(start+index).padStart(2,'0');
-      return `<div class="hour"><span>${readableHour(hour+':00')}</span><div>${entries.filter(event=>event.start.startsWith(hour)).map(event=>eventLine(event,tv)).join('')}</div></div>`;
+      return `<div class="hour"><span>${readableHour(hour+':00')}</span><div>${entries.filter(event=>event.start.startsWith(hour)).map(event=>eventLine(event,tv||!event.editable)).join('')}</div></div>`;
     }).join('')}</div>`;
   } else {
     const next=monthStart(day,1);
     const entries=events.filter(event=>event.date>=month&&event.date<next);
-    content=entries.length? [...new Set(entries.map(event=>event.date))].map(key=>`<section class="agenda-day"><h2>${dateLabel(key,{day:'numeric',month:'long',weekday:'short'})}</h2>${entries.filter(event=>event.date===key).map(event=>eventLine(event,tv)).join('')}</section>`).join(''):'<p class="empty">No tienes eventos en este mes.</p>';
+    content=entries.length? [...new Set(entries.map(event=>event.date))].map(key=>`<section class="agenda-day"><h2>${dateLabel(key,{day:'numeric',month:'long',weekday:'short'})}</h2>${entries.filter(event=>event.date===key).map(event=>eventLine(event,tv||!event.editable)).join('')}</section>`).join(''):'<p class="empty">No tienes eventos en este mes.</p>';
   }
-  return `<section class="panel calendar calendar-${view}">${buttons}${!tv&&signedIn?`<button class="primary add" data-new-event>＋ Añadir evento</button>`:''}${content}${!tv&&editing?eventForm(editing,day):''}</section>`;
+  return `<section class="panel calendar calendar-${view}">${buttons}${!tv&&signedIn?`<button class="primary add" data-new-event>＋ Añadir evento</button>`:''}${!tv&&editing?eventForm(editing,day):''}${content}</section>`;
 }

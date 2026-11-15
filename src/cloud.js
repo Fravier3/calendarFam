@@ -10,6 +10,8 @@ const account = new Account(client);
 const tables = new TablesDB(client);
 const storage = new Storage(client);
 const permissions = user => [Permission.read(Role.user(user)),Permission.update(Role.user(user)),Permission.delete(Role.user(user))];
+const ownedBy = (row,user) => Boolean(user&&row.$permissions.includes(Permission.update(Role.user(user))));
+
 
 export async function session() {
   try {return await account.get();}
@@ -21,7 +23,7 @@ export async function signIn(email,password,name) {
   return account.get();
 }
 export async function signOut() {await account.deleteSession({sessionId:'current'});}
-export async function state() {
+export async function state(user) {
   const result=[];
   let last;
   do {
@@ -32,7 +34,11 @@ export async function state() {
     last=page.length===100?page.at(-1).$id:null;
   } while(last);
   return result.flatMap(row=>{
-    try {return [{...JSON.parse(row.payload),id:row.$id,kind:row.kind}];}
+    try {
+      const {kind,payload}=row.data??row;
+      if(!['event','settings','photo'].includes(kind))return [];
+      return [{...JSON.parse(payload),id:row.$id,kind,updatedAt:row.$updatedAt,editable:ownedBy(row,user)}];
+    }
     catch {return [];}
   });
 }
@@ -46,7 +52,7 @@ export async function upload(user,file) {
   return storage.createFile({bucketId,fileId:ID.unique(),file,permissions:permissions(user)});
 }
 export async function deletePhoto(fileId) {await storage.deleteFile({bucketId,fileId});}
-export async function privatePhoto(fileId) {
+export async function displayPhoto(fileId) {
   const path=storage.getFileDownload({bucketId,fileId});
   const headers={'X-Appwrite-Project':project};
   const fallback=localStorage.getItem('cookieFallback');

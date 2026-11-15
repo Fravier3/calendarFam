@@ -5,6 +5,7 @@ import {calendarView} from './calendar.js';
 import {photoForm,settingsForm,widgetsForm} from './settings.js';
 import {landscapes} from './landscapes.js';
 import {temperature,weather} from './weather.js';
+import {tvNavigation} from './tv-navigation.js';
 
 const root=document.querySelector('#root');
 const query=new URLSearchParams(location.search);
@@ -12,11 +13,13 @@ const native=query.has('native');
 const tv=native||query.has('tv');
 document.body.classList.toggle('tv',tv);
 let account=null,records=[],settings={...defaults},events=[],photos=[],lastSnapshot='',syncPromise,rotation,scene=0,selection='';
-let tab=tv?'ambient':'account',day=dateKey(),view='month',previousView='month',editing=null,weatherData=null,notice='';
+let tab=tv?'ambient':'calendar',day=dateKey(),view='month',previousView='month',editing=null,weatherData=null,notice='';
 const photoCache=new Map();
 let backgroundEpoch=0;
 const clockSettings={timeZone:ZONE,hour:'numeric',minute:'2-digit'};
 const settingsId=()=>account.$id;
+const navigation=tv?tvNavigation(root,()=>tab,back):null;
+const TV_REFRESH=5*60*1000;
 function show(message) {
   notice=message;
   const output=document.querySelector('#notice');
@@ -30,17 +33,24 @@ function gallery() {
   return [...ordered,...byId.values()];
 }
 async function sync(force=false) {
-  if(!account)return;
-  if(syncPromise) {await syncPromise;if(!force)return;}
+  if(syncPromise){
+    await syncPromise;
+    if(!force)return;
+  }
   syncPromise=(async()=>{
-    const next=await cloud.state();
+    const next=await cloud.state(account?.$id);
     const snapshot=JSON.stringify(next);
     if(snapshot===lastSnapshot&&!force)return;
     records=next;
     lastSnapshot=snapshot;
-    settings={...defaults,...records.find(x=>x.kind==='settings'&&x.id===settingsId())};
+    const activeSettings=records.filter(x=>x.kind==='settings').sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
+    settings={...defaults,...activeSettings};
     events=sortedEvents(records.filter(x=>x.kind==='event'));
     photos=records.filter(x=>x.kind==='photo');
+    const available=new Set(photos.map(record=>record.fileId));
+    for(const [file,url] of photoCache){
+      if(!available.has(file)){URL.revokeObjectURL(url);photoCache.delete(file);}
+    }
     if(force||tv||!root.querySelector('form')&&tab!=='account')render();
   })();
   try {await syncPromise;} finally {syncPromise=null;}
@@ -51,13 +61,13 @@ function clearSession() {
   account=null;records=[];settings={...defaults};events=[];photos=[];lastSnapshot='';
 }
 async function saveSettings(change) {
-  const {id,kind,...payload}={...settings,...change};
+  const {id,kind,updatedAt,editable,...payload}={...settings,...change};
   await cloud.saveRecord(account.$id,'settings',payload,settingsId());
   await sync(true);
 }
 async function photoUrl(photo) {
   if(photo.kind!=='photo')return native?'/tv-assets/'+photo.id+'.webp':photo.url;
-  if(!photoCache.has(photo.fileId))photoCache.set(photo.fileId,await cloud.privatePhoto(photo.fileId));
+  if(!photoCache.has(photo.fileId))photoCache.set(photo.fileId,await cloud.displayPhoto(photo.fileId));
   return photoCache.get(photo.fileId);
 }
 async function changeBackground() {
@@ -81,9 +91,9 @@ async function changeBackground() {
       name.textContent=photo.name;
       credit.replaceChildren();
       if(settings.place)credit.append(name);
-      if(photo.wiki){
-        const link=document.createElement(tv?'span':'a');
-        if(!tv){link.href=photo.wiki;link.target='_blank';link.rel='noopener noreferrer';}
+      if(photo.wiki&&!tv){
+        const link=document.createElement('a');
+        link.href=photo.wiki;link.target='_blank';link.rel='noopener noreferrer';
         link.textContent=photo.author+' · '+photo.license;
         credit.append(link);
       }
@@ -120,26 +130,41 @@ function ambientView() {
   </div><div class="credit"></div></section>`;
 }
 function accountView() {
-  if(account)return `<section class="panel form-grid"><h1>Tu cuenta</h1><p>${safe(account.name||account.email)}</p><p>Usa esta misma cuenta en el teléfono y en la TV para compartir eventos, ajustes e imágenes.</p><button class="primary" data-tab="ambient">Abrir Ambiente</button><button data-logout>Cerrar sesión</button></section>`;
-  return `<section class="panel signin"><h1>Tu centro familiar</h1><p>Entra con la misma cuenta en el celular y la TV.</p><form class="form-grid" data-form="login"><label>Correo<input name="email" type="email" autocomplete="email" required></label><label>Contraseña<input name="password" type="password" minlength="8" autocomplete="current-password" required></label><button class="primary">Entrar</button></form>
-  ${!tv?`<details><summary>Crear una cuenta</summary><form class="form-grid" data-form="signup"><label>Tu nombre<input name="name" autocomplete="name" maxlength="75" required></label><label>Correo<input name="email" type="email" autocomplete="email" required></label><label>Contraseña<input name="password" type="password" minlength="8" autocomplete="new-password" required></label><button class="primary">Crear cuenta</button></form></details>`:''}</section>`;
+  if(account)return `<section class="panel form-grid"><h1>Tu cuenta</h1><p>${safe(account.name||account.email)}</p><button class="primary" data-tab="calendar">Abrir calendario</button><button data-logout>Cerrar sesión</button></section>`;
+  return `<section class="panel signin"><h1>Tu centro familiar</h1><p>Entra para editar el calendario y personalizar la TV.</p><form class="form-grid" data-form="login"><label>Correo<input name="email" type="email" autocomplete="email" required></label><label>Contraseña<input name="password" type="password" minlength="8" autocomplete="current-password" required></label><button class="primary">Entrar</button></form>
+  <details><summary>Crear una cuenta</summary><form class="form-grid" data-form="signup"><label>Tu nombre<input name="name" autocomplete="name" maxlength="75" required></label><label>Correo<input name="email" type="email" autocomplete="email" required></label><label>Contraseña<input name="password" type="password" minlength="8" autocomplete="new-password" required></label><button class="primary">Crear cuenta</button></form></details></section>`;
 }
-const tabs=tv?[['ambient','Ambiente'],['calendar','Calendario'],['account','Cuenta']]:[['ambient','Portada'],['calendar','Calendario'],['photos','Fondos'],['settings','Personalizar'],['account','Cuenta']];
+const tabs=tv?[['ambient','Ambiente'],['calendar','Calendario']]:[['ambient','Portada'],['calendar','Calendario'],['photos','Fondos'],['settings','Personalizar'],['account','Cuenta']];
 function render() {
-  const focus=document.activeElement?.dataset.day||document.activeElement?.dataset.tab;
-  const showForm=account||!['photos','settings'].includes(tab);
-  const content=!showForm?accountView():tab==='ambient'?ambientView():tab==='calendar'?calendarView(events,{day,view,tv,signedIn:!!account,editing}):tab==='photos'?photoForm(gallery(),settings):tab==='settings'?settingsForm(settings)+widgetsForm(settings):accountView();
-  root.innerHTML=`<header class="top"><strong>Centro Vazquez Santiago</strong><nav>${tabs.map(([id,label])=>`<button data-tab="${id}" aria-current="${tab===id?'page':'false'}">${label}</button>`).join('')}</nav></header><div class="main ${tab==='ambient'?'full':''}">${content}</div><output id="notice" aria-live="polite">${safe(notice)}</output>`;
+  const active=document.activeElement;
+  const focusKey=['day','tab','view','step','today'].find(key=>active?.dataset[key]!==undefined);
+  const focusValue=focusKey&&active.dataset[focusKey];
+  const previousMenu=root.querySelector('.tv-menu');
+  const menuHidden=tab==='ambient'&&(!previousMenu||previousMenu.hidden);
+  const oldImage=root.querySelector('.backdrop[src]');
+  const oldPhoto=gallery().find(photo=>photo.id===selection&&!settings.hidden.includes(photo.id));
+  const authNeeded=!tv&&!account&&['photos','settings'].includes(tab);
+  const content=authNeeded?accountView():tab==='ambient'?ambientView():tab==='calendar'?calendarView(events,{day,view,tv,signedIn:!!account,editing}):tab==='photos'?photoForm(gallery(),settings):tab==='settings'?settingsForm(settings)+widgetsForm(settings):accountView();
+  const buttons=tabs.map(([id,label])=>`<button data-tab="${id}" aria-current="${tab===id?'page':'false'}">${label}</button>`).join('');
+  const header=tv?`<nav class="tv-menu ${tab==='ambient'?'tv-menu-overlay':''}" aria-label="Pantallas de TV" ${menuHidden?'hidden':''}>${buttons}</nav>`:`<header class="top"><strong><img src="/icon-192.png" alt="" width="32" height="32">Centro Vázquez Santiago</strong><nav aria-label="Secciones">${buttons}</nav></header>`;
+  root.innerHTML=`${header}<div class="main ${tab==='ambient'?'full':''}">${content}</div><output id="notice" aria-live="polite">${safe(notice)}</output>`;
   clearInterval(rotation);
   if(tab==='ambient'){
+    const stage=root.querySelector('.backdrop');
+    if(oldImage&&oldPhoto) {
+      stage.src=oldImage.src;
+      if(settings.place&&tv)root.querySelector('.credit').textContent=oldPhoto.name;
+    }
     const selectedIndex=gallery().filter(p=>!settings.hidden.includes(p.id)).findIndex(p=>p.id===selection);
     if(selectedIndex>=0)scene=selectedIndex;
     updateClock();changeBackground();
-    rotation=setInterval(()=>{scene++;changeBackground();},clamp(Number(settings.interval),8,120)*1000);
+    const seconds=tv&&Number(settings.interval)===20?17:Number(settings.interval);
+    rotation=setInterval(()=>{scene++;changeBackground();},clamp(seconds,8,120)*1000);
   }
-  if(tv){
-    const candidates=[...root.querySelectorAll('[data-day],[data-tab]')];
-    (candidates.find(el=>el.dataset.day===focus||el.dataset.tab===focus)||root.querySelector('[data-tab="'+tab+'"]'))?.focus({preventScroll:true});
+  if(tv&&!menuHidden){
+    const candidates=[...root.querySelectorAll('button')];
+    const previous=candidates.find(el=>focusKey&&el.dataset[focusKey]===focusValue);
+    (previous||root.querySelector('[data-tab="'+tab+'"]'))?.focus({preventScroll:true});
   }
 }
 async function submit(form) {
@@ -149,7 +174,7 @@ async function submit(form) {
   try {
     if(['login','signup'].includes(form.dataset.form)){
       account=await cloud.signIn(data.email,data.password,data.name?.trim());
-      tab='ambient';notice='Sesión iniciada';await sync(true);render();return;
+      tab='calendar';notice='Sesión iniciada';await sync(true);return;
     }
     if(!account)throw new Error('Entra a tu cuenta para guardar.');
     switch(form.dataset.form){
@@ -177,7 +202,7 @@ async function submit(form) {
         if(!file?.size||file.size>20_000_000)throw new Error('Selecciona una imagen de hasta 20 MB.');
         if(!data.name.trim())throw new Error('Escribe el nombre de la imagen.');
         const saved=await cloud.upload(account.$id,file);
-        try {await cloud.saveRecord(account.$id,'photo',{name:data.name.trim(),fileId:saved.$id});}
+        try {await cloud.saveRecord(account.$id,'photo',{name:data.name.trim(),fileId:saved.$id},undefined);}
         catch(error){await cloud.deletePhoto(saved.$id).catch(()=>{});throw error;}
         await sync(true);break;
       }
@@ -192,10 +217,16 @@ root.addEventListener('click',async event=>{
   if(!button||button.closest('form')&&button.type==='submit')return;
   const d=button.dataset;
   try {
-    if(d.tab){tab=d.tab;editing=null;notice='';render();if(account)sync().catch(report);return;}
-    if('logout'in d){await cloud.signOut();clearSession();tab='account';render();return;}
+    if(d.tab){
+      tab=d.tab;editing=null;notice='';
+      if(tv&&tab==='ambient')navigation.hide();
+      render();
+      if(tv)refreshTV();else sync().catch(report);
+      return;
+    }
+    if('logout'in d){await cloud.signOut();clearSession();tab='calendar';render();await sync(true);return;}
     if(d.view){view=d.view;render();return;}
-    if(d.day){previousView=view;view='day';day=d.day;render();return;}
+    if(d.day){previousView=view;view='day';day=d.day;render();if(tv)root.querySelector('[data-view=day]')?.focus();return;}
     if(d.step){day=['month','agenda'].includes(view)?monthStart(day,Number(d.step)):addDays(day,Number(d.step)*(view==='week'?7:1));render();return;}
     if('today'in d){day=dateKey();render();return;}
     if('newEvent'in d||d.edit){editing=d.edit?events.find(item=>item.id===d.edit):{};render();root.querySelector('[data-form=event] input[name=title]')?.focus();return;}
@@ -207,29 +238,52 @@ root.addEventListener('click',async event=>{
     if(d.deletePhoto&&confirm('¿Eliminar esta foto de tu cuenta?')){const photo=photos.find(item=>item.id===d.deletePhoto);await cloud.deleteRecord(photo.id);await cloud.deletePhoto(photo.fileId);await sync(true);}
   } catch(error){report(error);}
 });
-if(tv) document.addEventListener('keydown',event=>{
-  if(['INPUT','TEXTAREA'].includes(event.target.tagName))return;
-  if(event.key==='Escape'||event.key==='BrowserBack'){
-    if(tab==='calendar'&&view==='day'){view=previousView;render();}
-    else {tab='ambient';render();}
-    event.preventDefault();return;
+function back() {
+  if(tab==='calendar'&&view==='day'){
+    view=previousView==='day'?'month':previousView;
+    render();
+    [...root.querySelectorAll('[data-day]')].find(button=>button.dataset.day===day)?.focus();
+    return;
   }
-  const axis={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];
-  if(!axis)return;
-  const center=element=>{const rect=element.getBoundingClientRect();return [rect.x+rect.width/2,rect.y+rect.height/2];};
-  const [x,y]=center(document.activeElement);
-  const next=[...root.querySelectorAll('button:not([disabled]),input,summary')].map(element=>{
-    const [cx,cy]=center(element), along=(cx-x)*axis[0]+(cy-y)*axis[1], across=Math.abs((cx-x)*axis[1]+(cy-y)*axis[0]);
-    return {element,along,score:along+across*3};
-  }).filter(item=>item.along>3).sort((a,b)=>a.score-b.score)[0];
-  if(next){next.element.focus();event.preventDefault();}
-});
-window.addEventListener('calendar-native-back',()=>{if(tab==='calendar'&&view==='day')view=previousView;else tab='ambient';render();});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync().catch(report);updateClock();}});
+  tab='ambient';
+  navigation?.hide();
+  render();
+}
+
+let tvRequest;
+function refreshTV() {
+  if(tvRequest)return tvRequest;
+  tvRequest=(async()=>{
+    try {
+      await sync();
+      if(notice)show('');
+    } catch(error) {
+      if(tab==='calendar')show('No se pudo actualizar el calendario. Se intentará nuevamente.');
+    }
+  })().finally(()=>{tvRequest=null;});
+  return tvRequest;
+}
+function resume() {
+  if(document.hidden)return;
+  if(tv)refreshTV();
+  else sync().catch(report);
+  updateClock();
+}
+document.addEventListener('visibilitychange',resume);
+window.addEventListener('pageshow',resume);
+if(tv)window.addEventListener('focus',resume);
+window.addEventListener('online',resume);
 render();
 refreshWeather();
-cloud.session().then(async user=>{if(user){account=user;if(!tv)tab='ambient';await sync(true);}}).catch(report);
+if(tv) {
+  refreshTV();
+  setInterval(()=>{if(!document.hidden)refreshTV();},TV_REFRESH);
+} else {
+  cloud.session().then(user=>{
+    account=user;
+  }).catch(report).finally(()=>sync(true).catch(report));
+  setInterval(()=>{if(!document.hidden)sync().catch(report);},30000);
+}
 setInterval(updateClock,1000);
 setInterval(refreshWeather,10*60*1000);
-setInterval(()=>{if(account&&!document.hidden)sync().catch(report);},tv?10000:30000);
 if(!native&&'serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').then(reg=>reg.update()).catch(()=>{});
