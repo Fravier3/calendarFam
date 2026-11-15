@@ -74,7 +74,15 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        view.evaluateJavascript("window.dispatchEvent(new Event('calendar-native-back'))",null);
+        view.evaluateJavascript(
+            "(function() {" +
+            "  if (!document.querySelector('.main:not(.full)')) return true;" +
+            "  window.dispatchEvent(new Event('calendar-native-back'));" +
+            "  return false;" +
+            "})()",
+            result -> {
+                if (!"false".equals(result) && !isFinishing()) finish();
+            });
     }
 
     @Override protected void onResume() {
