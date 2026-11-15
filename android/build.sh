@@ -11,7 +11,7 @@ cp -R ../dist/. build/assets/web/
 cp "${CALENDAR_BACKGROUNDS}"/pr-*.webp build/assets/tv-assets/
 "${ANDROID_BUILD_TOOLS}"/aapt2 compile --dir res -o build/resources.zip
 "${ANDROID_BUILD_TOOLS}"/aapt2 link -I "${ANDROID_PLATFORM_JAR}" --manifest AndroidManifest.xml -o build/resources.apk -A build/assets build/resources.zip
-javac --release 8 -classpath "${ANDROID_PLATFORM_JAR}" -d build/classes src/MainActivity.java
+javac --release 8 -classpath "${ANDROID_PLATFORM_JAR}" -d build/classes src/*.java
 "${ANDROID_BUILD_TOOLS}"/d8 --lib "${ANDROID_PLATFORM_JAR}" --min-api 23 --output build/dex $(find build/classes -name '*.class')
 cp build/resources.apk build/unsigned.apk
 (cd build/dex && zip -q ../unsigned.apk classes.dex)

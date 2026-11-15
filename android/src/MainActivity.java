@@ -16,6 +16,7 @@ public final class MainActivity extends Activity {
     private static final String HOST = "calendar-fam.vercel.app";
     private static final String HOME = "https://" + HOST + "/?native=1";
     private WebView view;
+    private ApkUpdater updater;
     private volatile boolean offline;
 
     @Override public void onCreate(Bundle state) {
@@ -59,6 +60,7 @@ public final class MainActivity extends Activity {
                 }
             }
         });
+        updater = new ApkUpdater(this);
         setContentView(view);
         view.requestFocus();
         view.loadUrl(HOME);
@@ -87,9 +89,19 @@ public final class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (updater != null) updater.check();
         if (view != null && offline) {
             offline = false;
             view.loadUrl(HOME);
         }
+    }
+    @Override protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (updater != null) updater.activityResult(requestCode);
+    }
+
+    @Override protected void onDestroy() {
+        if (updater != null) updater.close();
+        super.onDestroy();
     }
 }
