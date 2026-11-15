@@ -16,7 +16,7 @@ export function tvNavigation(root, activeTab, goBack) {
 
   function show() {
     const nav = menu();
-    if (!nav) return;
+    if (!nav || activeTab() !== 'ambient') return;
     nav.hidden = false;
     if (activeTab() === 'ambient') {
       clearTimeout(timer);
@@ -36,7 +36,7 @@ export function tvNavigation(root, activeTab, goBack) {
     const select = event.key === 'Enter' || event.key === ' ';
     if (direction < 0 && !select) return;
     const nav = menu();
-    if (nav?.hidden) {
+    if (activeTab() === 'ambient' && nav?.hidden) {
       event.preventDefault();
       if (!event.repeat) {
         show();
@@ -52,7 +52,7 @@ export function tvNavigation(root, activeTab, goBack) {
     event.preventDefault();
 
     const rows = [
-      [...root.querySelectorAll('.tv-menu button')],
+      [...root.querySelectorAll('.tv-menu:not([hidden]) button')],
       [...root.querySelectorAll('.period button')],
       [...root.querySelectorAll('.segments button')],
       [...root.querySelectorAll('.week-day')],

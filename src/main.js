@@ -12,6 +12,7 @@ const query=new URLSearchParams(location.search);
 const native=query.has('native');
 const tv=native||query.has('tv');
 document.body.classList.toggle('tv',tv);
+document.documentElement.classList.toggle('tv-page',tv);
 let account=null,records=[],settings={...defaults},events=[],photos=[],lastSnapshot='',syncPromise,rotation,scene=0,selection='';
 let tab=tv?'ambient':'calendar',day=dateKey(),view='month',previousView='month',editing=null,weatherData=null,notice='';
 const photoCache=new Map();
@@ -157,7 +158,7 @@ function render() {
   const focusKey=['day','tab','view','step','today'].find(key=>active?.dataset[key]!==undefined);
   const focusValue=focusKey&&active.dataset[focusKey];
   const previousMenu=root.querySelector('.tv-menu');
-  const menuHidden=tab==='ambient'&&(!previousMenu||previousMenu.hidden);
+  const menuHidden=tab!=='ambient'||!previousMenu||previousMenu.hidden;
   const oldImage=root.querySelector('.backdrop.current[src]');
   const oldPhoto=gallery().find(photo=>photo.id===selection&&!settings.hidden.includes(photo.id));
   const authNeeded=!account&&(tab==='calendar'||!tv&&['photos','settings'].includes(tab));
@@ -179,10 +180,10 @@ function render() {
     const seconds=tv&&Number(settings.interval)===20?17:Number(settings.interval);
     rotation=setInterval(()=>{scene++;changeBackground();},clamp(seconds,8,120)*1000);
   }
-  if(tv&&!menuHidden){
-    const candidates=[...root.querySelectorAll('button')];
+  if(tv&&(tab==='calendar'||!menuHidden)){
+    const candidates=[...root.querySelectorAll('button:not([hidden] button)')];
     const previous=candidates.find(el=>focusKey&&el.dataset[focusKey]===focusValue);
-    (previous||root.querySelector('[data-tab="'+tab+'"]'))?.focus({preventScroll:true});
+    (previous||root.querySelector(tab==='calendar'?'[aria-pressed=true], .signin input':'[data-tab="ambient"]'))?.focus({preventScroll:true});
   }
 }
 async function submit(form) {
