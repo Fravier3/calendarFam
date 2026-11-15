@@ -2,7 +2,9 @@ package com.fravier3.calendarfam.tv;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Build;
 import android.view.View;
+import android.view.KeyEvent;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.WebResourceRequest;
@@ -10,6 +12,8 @@ import android.webkit.WebResourceError;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 import java.io.IOException;
 
 public final class MainActivity extends Activity {
@@ -18,6 +22,7 @@ public final class MainActivity extends Activity {
     private WebView view;
     private ApkUpdater updater;
     private volatile boolean offline;
+    private Runnable unregisterBack;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -62,6 +67,7 @@ public final class MainActivity extends Activity {
         });
         updater = new ApkUpdater(this);
         setContentView(view);
+        if (Build.VERSION.SDK_INT >= 33) registerSystemBack();
         view.requestFocus();
         view.loadUrl(HOME);
     }
@@ -75,10 +81,34 @@ public final class MainActivity extends Activity {
         catch (IOException exception) {return null;}
     }
 
+    private void registerSystemBack() {
+        OnBackInvokedDispatcher dispatcher = getOnBackInvokedDispatcher();
+        OnBackInvokedCallback callback = this::handleBack;
+        dispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback);
+        unregisterBack = () -> dispatcher.unregisterOnBackInvokedCallback(callback);
+    }
+
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        int key = event.getKeyCode();
+        if (key == KeyEvent.KEYCODE_BACK || key == KeyEvent.KEYCODE_ESCAPE) {
+            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) handleBack();
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
     @Override public void onBackPressed() {
+        handleBack();
+    }
+
+    private void handleBack() {
+        if (view == null || isFinishing()) {
+            finish();
+            return;
+        }
         view.evaluateJavascript(
             "(function() {" +
-            "  if (!document.querySelector('.main:not(.full)')) return true;" +
+            "  if (document.querySelector('.main.full') || !document.querySelector('.main')) return true;" +
             "  window.dispatchEvent(new Event('calendar-native-back'));" +
             "  return false;" +
             "})()",
@@ -101,6 +131,7 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (unregisterBack != null) unregisterBack.run();
         if (updater != null) updater.close();
         super.onDestroy();
     }
