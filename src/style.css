@@ -73,9 +73,48 @@ button,input,select,textarea{background:var(--control)}
 /* TV: an edge-to-edge backdrop and a high-contrast calendar */
 body.tv{color-scheme:light;--canvas:#e9f1f6;--panel:#fff;--control:#eff5f8;--ink:#14273a;--muted:#52677a;--line:#dce7ed;--accent:#087c91;--blue:#086b87;--focus:#0086a1;background:#e9f1f6;color:var(--ink)}
 .tv .ambient{min-height:100vh;min-height:100svh;padding-inline:5vw}
-.tv .ambient::after{background:linear-gradient(0deg,#071522b5,transparent 24%),radial-gradient(ellipse at center,rgb(2 13 22 / var(--shade)),rgb(2 13 22 / .05) 90%)}
-.tv .credit{font-size:clamp(12px,1.35vw,23px);bottom:3vh}
-.tv .ambient-meta{bottom:6vh;inset-inline:20vw}
+.tv .ambient{
+  --edge-inline:clamp(24px,4.5vw,115px);
+  --edge-block:clamp(18px,5.6vh,100px);
+  padding:var(--edge-block) var(--edge-inline);
+  grid-template-rows:auto minmax(0,1fr) auto;
+  place-items:start stretch;
+  text-shadow:0 1px 12px #051e29b3;
+}
+.tv .ambient::after{
+  background:
+    radial-gradient(ellipse at top left,rgb(5 25 36 / var(--shade)),transparent 61%),
+    radial-gradient(ellipse at top right,rgb(5 25 36 / var(--shade)),transparent 33%),
+    linear-gradient(to top,rgb(5 22 19 / var(--shade)),transparent 29%);
+}
+.tv .readouts{display:flex;justify-content:space-between;align-items:flex-start;gap:1.4vw;text-align:left}
+.tv .stack .readouts{gap:1.6vh}
+.tv .readouts p{letter-spacing:0;text-transform:none}
+.tv .clock{display:flex;flex-direction:column;gap:.45em}
+.tv .ambient .clock time{order:-1;line-height:1;font-size:clamp(58px,calc(13.2vw * var(--scale)),340px);font-weight:560}
+.tv .clock-with-seconds .clock time{font-size:clamp(48px,calc(9.3vw * var(--scale)),265px)}
+.tv .clock small{font-size:.26em;margin-inline-start:.3em;font-weight:630}
+.tv .clock small:empty{display:none}
+.tv .clock p,.tv .only-date{font-size:clamp(18px,2.12vw,50px);font-weight:480}
+.tv .readouts :is(.clock p,.only-date)::first-letter{text-transform:uppercase}
+.tv .weather{margin-inline-start:auto;min-width:clamp(120px,13vw,325px);text-align:left;padding-top:.6vh}
+.tv .stack .weather{margin-inline-start:0}
+.tv .weather p{font-size:clamp(17px,2.05vw,48px);font-weight:630}
+.tv .readouts:has(.weather:only-child) .weather{margin-inline-start:auto}
+.tv .temperature{margin-block:.12em;font-size:clamp(29px,4vw,100px);font-weight:620;letter-spacing:-.04em}
+.tv .temperature i{color:inherit;font-size:.7em;vertical-align:.12em;margin-right:.28em}
+.tv .temperature small{font-size:.47em;margin-left:.18em;vertical-align:.2em}
+.tv .weather-data :is(strong,span){font-size:clamp(14px,1.55vw,38px);font-weight:480;line-height:1.22}
+.tv .ambient-meta{
+  grid-row:3;position:static;display:flex;justify-content:flex-start;align-items:center;
+  gap:clamp(9px,1.65vw,39px);text-align:left;max-width:72%;padding-bottom:.2vh;
+}
+.tv .ambient-meta p{min-width:0;max-width:24vw;overflow-wrap:anywhere}
+.tv .ambient-meta p+p{border-inline-start:1px solid #fff8;padding-inline-start:clamp(9px,1.65vw,39px)}
+.tv .ambient-meta small{font-size:clamp(13px,1.58vw,38px);text-transform:none;letter-spacing:0}
+.tv .ambient-meta strong{font-size:clamp(17px,2.22vw,52px);line-height:1.15}
+.tv .ambient-meta span{font-size:clamp(12px,1.48vw,35px);margin-top:.2em}
+.tv .credit{inset:auto var(--edge-inline) var(--edge-block) auto;max-width:25%;text-align:right;font-size:clamp(12px,1.35vw,32px)}
 .tv .tv-menu{display:flex;justify-content:center;gap:6px;padding:6px;width:max-content;max-width:94vw;margin:0 auto 12px;border:1px solid #d2e0e9;border-radius:18px;background:#fff;z-index:3}
 .tv .tv-menu-overlay{position:fixed;inset:2.8vh 0 auto;margin-bottom:0;box-shadow:0 8px 32px #0a243752}
 .tv .tv-menu button{min-height:43px;font-size:clamp(.9rem,1.55vw,1.45rem);font-weight:700;padding:6px 18px;border-color:transparent}

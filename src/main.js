@@ -134,16 +134,20 @@ async function refreshWeather() {
 }
 function weatherDisplay() {
   const w=weatherData,unit=settings.unit;
-  return `<div class="temperature"><i aria-hidden="true">${w?.icon||'○'}</i>${temperature(w?.temp,unit)}<small>${unit}</small></div><strong>${w?.kind||'Clima no disponible'}</strong>${settings.forecast&&w?`<span>Máx. ${temperature(w.max,unit)} · Mín. ${temperature(w.min,unit)}</span>`:''}`;
+  const forecast=w&&(tv
+    ? `${temperature(w.max,unit)} / ${temperature(w.min,unit)}`
+    : `Máx. ${temperature(w.max,unit)} · Mín. ${temperature(w.min,unit)}`);
+  return `<div class="temperature"><i aria-hidden="true">${w?.icon||'○'}</i>${temperature(w?.temp,unit)}<small>${unit}</small></div><strong>${w?.kind||'Clima no disponible'}</strong>${settings.forecast&&w?`<span>${forecast}</span>`:''}`;
 }
 function ambientView() {
   const today=dateKey();
+  const date=dateLabel(today,tv?{weekday:'long',day:'numeric',month:'long'}:{dateStyle:'full'});
   const now=new Intl.DateTimeFormat('en-GB',{timeZone:ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
   const next=events.find(item=>item.date>today||item.date===today&&item.end>=now);
-  return `<section class="ambient ${settings.layout==='stack'?'stack':''}" style="--shade:${clamp(Number(settings.shade),15,85)/100};--scale:${clamp(Number(settings.scale),70,130)/100}">
+  return `<section class="ambient ${settings.layout==='stack'?'stack':''} ${settings.seconds?'clock-with-seconds':''}" style="--shade:${clamp(Number(settings.shade),15,85)/100};--scale:${clamp(Number(settings.scale),70,130)/100}">
   <img class="backdrop" alt=""><img class="backdrop" alt=""><div class="readouts">
-  ${settings.clock?`<div class="clock">${settings.date?`<p>${dateLabel(today,{dateStyle:'full'})}</p>`:''}<time data-clock><span class="clock-digits"><span class="clock-number"></span><span class="clock-separator">:</span><span class="clock-number"></span>${settings.seconds?`<span class="clock-separator">:</span><span class="clock-number"></span>`:''}</span><small></small></time></div>`:(settings.date?`<p class="only-date">${dateLabel(today,{dateStyle:'full'})}</p>`:'')}
-  ${settings.weather?`<div class="weather"><p>Cayey, Puerto Rico</p><div class="weather-data">${weatherDisplay()}</div></div>`:''}</div>
+  ${settings.clock?`<div class="clock">${settings.date?`<p>${date}</p>`:''}<time data-clock><span class="clock-digits"><span class="clock-number"></span><span class="clock-separator">:</span><span class="clock-number"></span>${settings.seconds?`<span class="clock-separator">:</span><span class="clock-number"></span>`:''}</span><small></small></time></div>`:(settings.date?`<p class="only-date">${date}</p>`:'')}
+  ${settings.weather?`<div class="weather"><p>${tv?'Cayey':'Cayey, Puerto Rico'}</p><div class="weather-data">${weatherDisplay()}</div></div>`:''}</div>
   <div class="ambient-meta">${settings.next&&next?`<p><small>Próximo evento</small><strong>${safe(next.title)}</strong><span>${safe(dateLabel(next.date,{month:'short',day:'numeric'}))} · ${readableHour(next.start)}</span></p>`:''}
   ${settings.widgets.map(widget=>`<p><small>${safe(widget.title)}</small><strong>${widget.type==='countdown'?Math.max(0,Math.round((atDate(widget.date)-atDate(today))/86_400_000))+' días':safe(widget.text)}</strong></p>`).join('')}
   </div><div class="credit"></div></section>`;
