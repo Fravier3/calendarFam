@@ -75,8 +75,13 @@ async function changeBackground() {
   const stage=root.querySelector('.ambient');
   if(!stage)return;
   const list=gallery().filter(item=>!settings.hidden.includes(item.id));
-  const image=stage.querySelector('.backdrop');
-  if(!list.length){image.removeAttribute('src');stage.querySelector('.credit').replaceChildren();return;}
+  const layers=[...stage.querySelectorAll('.backdrop')];
+  const current=layers.find(layer=>layer.classList.contains('current'));
+  if(!list.length){
+    for(const layer of layers){layer.removeAttribute('src');layer.className='backdrop';}
+    stage.querySelector('.credit').replaceChildren();
+    return;
+  }
   const offset=scene%list.length;
   for(let step=0;step<list.length;step++){
     const photo=list[(offset+step)%list.length];
@@ -86,7 +91,16 @@ async function changeBackground() {
       preload.src=url;
       await preload.decode();
       if(epoch!==backgroundEpoch||!stage.isConnected)return;
-      image.src=url;selection=photo.id;
+      if(!current||current.src!==preload.src){
+        const incoming=layers.find(layer=>layer!==current);
+        incoming.className='backdrop';
+        incoming.src=url;
+        // Commit the starting opacity before switching the visible layer.
+        incoming.getBoundingClientRect();
+        if(current)current.className='backdrop previous';
+        incoming.classList.add('current');
+      }
+      selection=photo.id;
       const credit=stage.querySelector('.credit'), name=document.createElement('strong');
       name.textContent=photo.name;
       credit.replaceChildren();
@@ -105,7 +119,11 @@ function updateClock() {
   const time=root.querySelector('[data-clock]');
   if(!time)return;
   const parts=new Intl.DateTimeFormat('en-US',{...clockSettings,hour12:!settings.hour24,...(settings.seconds?{second:'2-digit'}:{})}).formatToParts(new Date());
-  time.firstElementChild.textContent=parts.filter(part=>part.type!=='dayPeriod').map(part=>part.value).join('').trim();
+  const digits=time.querySelectorAll('.clock-number');
+  const values=['hour','minute','second'].map(type=>parts.find(part=>part.type===type)?.value||'');
+  digits.forEach((digit,index)=>{digit.textContent=values[index];});
+  const hour24=Number(values[0])%12+(parts.some(part=>part.type==='dayPeriod'&&part.value==='PM')?12:0);
+  time.dateTime=[settings.hour24?values[0]:String(hour24).padStart(2,'0'),...values.slice(1)].filter(Boolean).join(':');
   time.lastElementChild.textContent=parts.find(part=>part.type==='dayPeriod')?.value||'';
 }
 async function refreshWeather() {
@@ -122,8 +140,8 @@ function ambientView() {
   const now=new Intl.DateTimeFormat('en-GB',{timeZone:ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
   const next=events.find(item=>item.date>today||item.date===today&&item.end>=now);
   return `<section class="ambient ${settings.layout==='stack'?'stack':''}" style="--shade:${clamp(Number(settings.shade),15,85)/100};--scale:${clamp(Number(settings.scale),70,130)/100}">
-  <img class="backdrop" alt=""><div class="readouts">
-  ${settings.clock?`<div class="clock">${settings.date?`<p>${dateLabel(today,{dateStyle:'full'})}</p>`:''}<time data-clock><span></span><small></small></time></div>`:(settings.date?`<p class="only-date">${dateLabel(today,{dateStyle:'full'})}</p>`:'')}
+  <img class="backdrop" alt=""><img class="backdrop" alt=""><div class="readouts">
+  ${settings.clock?`<div class="clock">${settings.date?`<p>${dateLabel(today,{dateStyle:'full'})}</p>`:''}<time data-clock><span class="clock-digits"><span class="clock-number"></span><span class="clock-separator">:</span><span class="clock-number"></span>${settings.seconds?`<span class="clock-separator">:</span><span class="clock-number"></span>`:''}</span><small></small></time></div>`:(settings.date?`<p class="only-date">${dateLabel(today,{dateStyle:'full'})}</p>`:'')}
   ${settings.weather?`<div class="weather"><p>Cayey, Puerto Rico</p><div class="weather-data">${weatherDisplay()}</div></div>`:''}</div>
   <div class="ambient-meta">${settings.next&&next?`<p><small>Próximo evento</small><strong>${safe(next.title)}</strong><span>${safe(dateLabel(next.date,{month:'short',day:'numeric'}))} · ${readableHour(next.start)}</span></p>`:''}
   ${settings.widgets.map(widget=>`<p><small>${safe(widget.title)}</small><strong>${widget.type==='countdown'?Math.max(0,Math.round((atDate(widget.date)-atDate(today))/86_400_000))+' días':safe(widget.text)}</strong></p>`).join('')}
@@ -140,7 +158,7 @@ function render() {
   const focusValue=focusKey&&active.dataset[focusKey];
   const previousMenu=root.querySelector('.tv-menu');
   const menuHidden=tab==='ambient'&&(!previousMenu||previousMenu.hidden);
-  const oldImage=root.querySelector('.backdrop[src]');
+  const oldImage=root.querySelector('.backdrop.current[src]');
   const oldPhoto=gallery().find(photo=>photo.id===selection&&!settings.hidden.includes(photo.id));
   const authNeeded=!account&&(tab==='calendar'||!tv&&['photos','settings'].includes(tab));
   const content=authNeeded?accountView():tab==='ambient'?ambientView():tab==='calendar'?calendarView(events,{day,view,tv,signedIn:!!account,editing}):tab==='photos'?photoForm(gallery(),settings):tab==='settings'?settingsForm(settings)+widgetsForm(settings):accountView();
@@ -152,6 +170,7 @@ function render() {
     const stage=root.querySelector('.backdrop');
     if(oldImage&&oldPhoto) {
       stage.src=oldImage.src;
+      stage.classList.add('current');
       if(settings.place&&tv)root.querySelector('.credit').textContent=oldPhoto.name;
     }
     const selectedIndex=gallery().filter(p=>!settings.hidden.includes(p.id)).findIndex(p=>p.id===selection);

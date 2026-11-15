@@ -55,6 +55,7 @@ export function tvNavigation(root, activeTab, goBack) {
       [...root.querySelectorAll('.tv-menu button')],
       [...root.querySelectorAll('.period button')],
       [...root.querySelectorAll('.segments button')],
+      [...root.querySelectorAll('.week-day')],
       ...[...root.querySelectorAll('.signin input,.signin button')].map(element=>[element]),
     ].filter(row => row.length);
     const cells = [...root.querySelectorAll('.month-grid [data-day]')];

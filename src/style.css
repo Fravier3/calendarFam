@@ -101,3 +101,40 @@ body.tv{color-scheme:light;--canvas:#e9f1f6;--panel:#fff;--control:#eff5f8;--ink
 @media(prefers-reduced-motion:no-preference){.tv .tv-menu-overlay{animation:tv-menu-in 160ms ease-out}}
 
 .tv .signin{max-width:580px;margin:5vh auto;padding:24px}.tv .signin :is(p,input,button){font-size:1.1rem}.tv .signin input:focus{outline:3px solid var(--focus);outline-offset:2px}
+
+/* Month stays a continuous grid. The weekly view uses a shared hour scale. */
+.calendar-month .month-grid{gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.calendar-month .month-grid>*{border:0;border-radius:0;background:var(--panel)}
+.calendar-month .weekday{padding:6px 0}
+.calendar-month .day{padding:4px;gap:3px}
+.calendar-month .day.other{background:var(--control)}
+.calendar-month .day-number{align-self:end;padding-inline:4px}
+.calendar-month .day .more{right:auto;left:4px;top:4px}
+.calendar-month .day .chip{padding:2px 4px;font-weight:650}
+.calendar-legend{display:flex;justify-content:center;flex-wrap:wrap;gap:5px 14px;list-style:none;margin:0;padding:9px 0 0;color:var(--muted);font-size:clamp(.68rem,1.05vw,1rem)}
+.calendar-legend li{display:flex;align-items:center;gap:5px}
+.calendar-legend span{width:10px;height:10px;border-radius:50%;border:1px solid currentColor}
+.tv .calendar-month{grid-template-rows:auto auto 1fr auto}
+.week-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.week-grid{--hour-size:clamp(48px,5.2vh,78px);display:grid;grid-template-columns:clamp(58px,6vw,105px) repeat(7,minmax(0,1fr));min-width:650px}
+.week-corner,.week-day,.week-hours,.week-column{border:0;border-right:1px solid var(--line)}
+.week-corner,.week-day{border-bottom:1px solid var(--line);background:var(--panel)}
+.week-day{display:grid;justify-items:center;gap:3px;padding:5px;border-radius:0;line-height:1.15;color:var(--muted)}
+.week-day strong{display:grid;place-items:center;min-width:1.55em;min-height:1.55em;color:var(--ink);font-size:clamp(1rem,1.6vw,1.65rem)}
+.week-day[aria-current=date] strong{background:var(--accent);color:var(--panel);border-radius:50%}
+.week-day:focus{outline-offset:-3px!important}
+.week-hours{display:grid;grid-template-rows:repeat(var(--hours),var(--hour-size));text-align:right;color:var(--muted);font-size:clamp(.68rem,1.05vw,1rem)}
+.week-hours span{padding:4px 6px 0 2px}
+.week-column{position:relative;height:calc(var(--hours)*var(--hour-size));background:repeating-linear-gradient(to bottom,transparent 0 calc(var(--hour-size) - 1px),var(--line) calc(var(--hour-size) - 1px) var(--hour-size))}
+.week-column[data-current-day]{background-color:var(--control)}
+.week-column:last-child,.week-day:nth-child(8){border-right:0}
+.week-event{position:absolute;top:var(--top);left:calc(var(--left) + 2px);width:calc(var(--width) - 4px);height:var(--length);min-height:0;border:0;border-radius:6px;padding:3px 5px;text-align:left;overflow:hidden;font-size:clamp(.66rem,1.1vw,1.08rem);line-height:1.2}
+.week-event :is(strong,small){display:block;color:inherit;overflow:hidden;text-overflow:ellipsis}
+.week-event small{white-space:nowrap;font-size:.9em}
+.tv .calendar.calendar-week{display:block}
+.ambient .backdrop{opacity:0;z-index:-4;transition:opacity 1s ease-in-out}
+.ambient .backdrop.previous{opacity:1;z-index:-3;transition:none}
+.ambient .backdrop.current{opacity:1;z-index:-2}
+.ambient .clock time{font-family:Inter,"Avenir Next","Segoe UI",system-ui,sans-serif;font-weight:620;letter-spacing:-.025em}
+.clock-separator{display:inline-block;margin-inline:.055em;letter-spacing:normal}
+@media(prefers-reduced-motion:reduce){.ambient .backdrop{transition:none}}
