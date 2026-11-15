@@ -51,7 +51,7 @@ async function sync(force=false) {
     for(const [file,url] of photoCache){
       if(!available.has(file)){URL.revokeObjectURL(url);photoCache.delete(file);}
     }
-    if(force||tv||!root.querySelector('form')&&tab!=='account')render();
+    if(force||!root.querySelector('form')&&(tv||tab!=='account'))render();
   })();
   try {await syncPromise;} finally {syncPromise=null;}
 }
@@ -131,8 +131,7 @@ function ambientView() {
 }
 function accountView() {
   if(account)return `<section class="panel form-grid"><h1>Tu cuenta</h1><p>${safe(account.name||account.email)}</p><button class="primary" data-tab="calendar">Abrir calendario</button><button data-logout>Cerrar sesión</button></section>`;
-  return `<section class="panel signin"><h1>Tu centro familiar</h1><p>Entra para editar el calendario y personalizar la TV.</p><form class="form-grid" data-form="login"><label>Correo<input name="email" type="email" autocomplete="email" required></label><label>Contraseña<input name="password" type="password" minlength="8" autocomplete="current-password" required></label><button class="primary">Entrar</button></form>
-  <details><summary>Crear una cuenta</summary><form class="form-grid" data-form="signup"><label>Tu nombre<input name="name" autocomplete="name" maxlength="75" required></label><label>Correo<input name="email" type="email" autocomplete="email" required></label><label>Contraseña<input name="password" type="password" minlength="8" autocomplete="new-password" required></label><button class="primary">Crear cuenta</button></form></details></section>`;
+  return `<section class="panel signin"><h1>${tv?'Calendario familiar':'Tu centro familiar'}</h1><p>${tv?'Entra una vez con la cuenta familiar de la TV.':'Entra para ver y editar el calendario familiar.'}</p><form class="form-grid" data-form="login"><label>Correo<input name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" required></label><label>Contraseña<input name="password" type="password" minlength="8" autocomplete="current-password" required></label><button class="primary">Entrar</button></form></section>`;
 }
 const tabs=tv?[['ambient','Ambiente'],['calendar','Calendario']]:[['ambient','Portada'],['calendar','Calendario'],['photos','Fondos'],['settings','Personalizar'],['account','Cuenta']];
 function render() {
@@ -143,7 +142,7 @@ function render() {
   const menuHidden=tab==='ambient'&&(!previousMenu||previousMenu.hidden);
   const oldImage=root.querySelector('.backdrop[src]');
   const oldPhoto=gallery().find(photo=>photo.id===selection&&!settings.hidden.includes(photo.id));
-  const authNeeded=!tv&&!account&&['photos','settings'].includes(tab);
+  const authNeeded=!account&&(tab==='calendar'||!tv&&['photos','settings'].includes(tab));
   const content=authNeeded?accountView():tab==='ambient'?ambientView():tab==='calendar'?calendarView(events,{day,view,tv,signedIn:!!account,editing}):tab==='photos'?photoForm(gallery(),settings):tab==='settings'?settingsForm(settings)+widgetsForm(settings):accountView();
   const buttons=tabs.map(([id,label])=>`<button data-tab="${id}" aria-current="${tab===id?'page':'false'}">${label}</button>`).join('');
   const header=tv?`<nav class="tv-menu ${tab==='ambient'?'tv-menu-overlay':''}" aria-label="Pantallas de TV" ${menuHidden?'hidden':''}>${buttons}</nav>`:`<header class="top"><strong><img src="/icon-192.png" alt="" width="32" height="32">Centro Vázquez Santiago</strong><nav aria-label="Secciones">${buttons}</nav></header>`;
@@ -172,8 +171,8 @@ async function submit(form) {
   const button=form.querySelector('button[type=submit],button:not([type])');
   if(button)button.disabled=true;
   try {
-    if(['login','signup'].includes(form.dataset.form)){
-      account=await cloud.signIn(data.email,data.password,data.name?.trim());
+    if(form.dataset.form==='login'){
+      account=await cloud.signIn(data.email.trim(),data.password);
       tab='calendar';notice='Sesión iniciada';await sync(true);return;
     }
     if(!account)throw new Error('Entra a tu cuenta para guardar.');
@@ -221,7 +220,7 @@ root.addEventListener('click',async event=>{
       tab=d.tab;editing=null;notice='';
       if(tv&&tab==='ambient')navigation.hide();
       render();
-      if(tv)refreshTV();else sync().catch(report);
+      if(tv)refreshTV();else if(account)sync().catch(report);
       return;
     }
     if('logout'in d){await cloud.signOut();clearSession();tab='calendar';render();await sync(true);return;}
@@ -252,6 +251,7 @@ function back() {
 
 let tvRequest;
 function refreshTV() {
+  if(!account)return;
   if(tvRequest)return tvRequest;
   tvRequest=(async()=>{
     try {
@@ -266,7 +266,7 @@ function refreshTV() {
 function resume() {
   if(document.hidden)return;
   if(tv)refreshTV();
-  else sync().catch(report);
+  else if(account)sync().catch(report);
   updateClock();
 }
 document.addEventListener('visibilitychange',resume);
@@ -275,14 +275,15 @@ if(tv)window.addEventListener('focus',resume);
 window.addEventListener('online',resume);
 render();
 refreshWeather();
+cloud.session().then(async user=>{
+  if(!user||account)return;
+  account=user;
+  await sync(true);
+}).catch(report);
 if(tv) {
-  refreshTV();
   setInterval(()=>{if(!document.hidden)refreshTV();},TV_REFRESH);
 } else {
-  cloud.session().then(user=>{
-    account=user;
-  }).catch(report).finally(()=>sync(true).catch(report));
-  setInterval(()=>{if(!document.hidden)sync().catch(report);},30000);
+  setInterval(()=>{if(account&&!document.hidden)sync().catch(report);},30000);
 }
 setInterval(updateClock,1000);
 setInterval(refreshWeather,10*60*1000);

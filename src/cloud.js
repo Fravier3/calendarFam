@@ -1,15 +1,17 @@
-import {Account, Client, ID, Permission, Query, Role, Storage, TablesDB} from 'appwrite';
+import {Account, Client, ID, Permission, Query, Role, Storage, TablesDB, Teams} from 'appwrite';
 
 const endpoint = 'https://nyc.cloud.appwrite.io/v1';
 const project = '6af38e0f00161165b763';
 const databaseId = 'mantenimiento';
 const tableId = 'calendar-fam';
 const bucketId = 'calendar-fam-photos';
+const teamId = 'calendarfam-hogar';
 const client = new Client().setEndpoint(endpoint).setProject(project);
 const account = new Account(client);
 const tables = new TablesDB(client);
 const storage = new Storage(client);
-const permissions = user => [Permission.read(Role.user(user)),Permission.update(Role.user(user)),Permission.delete(Role.user(user))];
+const teams = new Teams(client);
+const permissions = user => [Permission.read(Role.user(user)),Permission.read(Role.team(teamId)),Permission.update(Role.user(user)),Permission.delete(Role.user(user))];
 const ownedBy = (row,user) => Boolean(user&&row.$permissions.includes(Permission.update(Role.user(user))));
 
 
@@ -17,10 +19,16 @@ export async function session() {
   try {return await account.get();}
   catch(error) {if(error.code===401) return null; throw error;}
 }
-export async function signIn(email,password,name) {
-  if (name) await account.create({userId:ID.unique(),email,password,name});
+export async function signIn(email,password) {
   await account.createEmailPasswordSession({email,password});
-  return account.get();
+  try {
+    await teams.get({teamId});
+    return await account.get();
+  } catch(error) {
+    await signOut().catch(()=>{});
+    if(error.code===401||error.code===404)throw new Error('Esta cuenta no tiene acceso al calendario familiar.');
+    throw error;
+  }
 }
 export async function signOut() {await account.deleteSession({sessionId:'current'});}
 export async function state(user) {

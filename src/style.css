@@ -99,3 +99,5 @@ body.tv{color-scheme:light;--canvas:#e9f1f6;--panel:#fff;--control:#eff5f8;--ink
 .tv .timeline .hour>span{font-size:clamp(.8rem,1.33vw,1.3rem)}
 @keyframes tv-menu-in{from{transform:translateY(-10px);opacity:0}to{transform:translateY(0);opacity:1}}
 @media(prefers-reduced-motion:no-preference){.tv .tv-menu-overlay{animation:tv-menu-in 160ms ease-out}}
+
+.tv .signin{max-width:580px;margin:5vh auto;padding:24px}.tv .signin :is(p,input,button){font-size:1.1rem}.tv .signin input:focus{outline:3px solid var(--focus);outline-offset:2px}

@@ -30,7 +30,9 @@ export function tvNavigation(root, activeTab, goBack) {
       goBack();
       return;
     }
+    const inField = event.target instanceof HTMLInputElement;
     const direction = arrows.indexOf(event.key);
+    if(inField&&(direction===2||direction===3||direction<0))return;
     const select = event.key === 'Enter' || event.key === ' ';
     if (direction < 0 && !select) return;
     const nav = menu();
@@ -53,6 +55,7 @@ export function tvNavigation(root, activeTab, goBack) {
       [...root.querySelectorAll('.tv-menu button')],
       [...root.querySelectorAll('.period button')],
       [...root.querySelectorAll('.segments button')],
+      ...[...root.querySelectorAll('.signin input,.signin button')].map(element=>[element]),
     ].filter(row => row.length);
     const cells = [...root.querySelectorAll('.month-grid [data-day]')];
     for (let index = 0; index < cells.length; index += 7) rows.push(cells.slice(index, index + 7));
